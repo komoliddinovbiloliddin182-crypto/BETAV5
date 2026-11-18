@@ -44,7 +44,7 @@ from auth import (
     register_user,
     require_admin,
 )
-from bot_engine import DEFAULT_PRODUCTS, build_dispatcher
+from bot_engine import DEFAULT_PRODUCTS, REQUEST_TEMPLATES, CATALOG_TEMPLATES, build_dispatcher
 from db import count_users, db, db_lock, get_setting, get_site_admin_id, init_db, set_setting
 
 logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"))
@@ -92,6 +92,8 @@ SETTING_DEFAULTS = {
 
 
 VALID_TEMPLATES = {"support", "shop", "quiz", "sub", "navbat", "feedback", "news", "poll", "info"}
+VALID_TEMPLATES |= set(REQUEST_TEMPLATES)      # 15 ta so'rov shabloni
+VALID_TEMPLATES |= set(CATALOG_TEMPLATES)      # 6 ta katalog shabloni
 TEMPLATE_LABELS = {
     "support": "Yordam markazi",
     "shop": "Onlayn do'kon",
@@ -103,6 +105,8 @@ TEMPLATE_LABELS = {
     "poll": "So'rovnomalar",
     "info": "Biznes ma'lumoti",
 }
+TEMPLATE_LABELS.update({k: v["label"] for k, v in REQUEST_TEMPLATES.items()})
+TEMPLATE_LABELS.update({k: v["label"] for k, v in CATALOG_TEMPLATES.items()})
 
 running_bots: dict[str, tuple[asyncio.Task, Bot]] = {}
 rate_log: dict[str, deque] = defaultdict(deque)
@@ -755,6 +759,43 @@ async def bot_products(bot_id: int, user=Depends(get_current_user)):
             (bot_id,),
         ).fetchall()
     return [dict(r) for r in rows]
+
+
+@app.get("/api/bots/{bot_id}/requests")
+async def bot_requests(bot_id: int, user=Depends(get_current_user)):
+    """Bot egasi uchun: request-engine shabloni yig'gan so'rovlar (callback, consultation, ...)."""
+    await _check_bot_owner(bot_id, user)
+    import json as _json
+    async with db_lock:
+        rows = db.execute(
+            "SELECT id, template, tg_user_id, tg_username, data_json, status, created_at "
+            "FROM contact_requests WHERE bot_id=? ORDER BY id DESC LIMIT 100",
+            (bot_id,),
+        ).fetchall()
+    out = []
+    for r in rows:
+        d = dict(r)
+        try:
+            d["data"] = _json.loads(r["data_json"])
+        except Exception:
+            d["data"] = {}
+        out.append(d)
+    return out
+
+
+@app.post("/api/bots/{bot_id}/requests/{req_id}/done")
+async def bot_request_done(bot_id: int, req_id: int, user=Depends(get_current_user)):
+    """Bot egasi: so'rovni 'bajarildi' deb belgilaydi."""
+    await _check_bot_owner(bot_id, user)
+    async with db_lock:
+        cur = db.execute(
+            "UPDATE contact_requests SET status='done' WHERE id=? AND bot_id=? AND status='new'",
+            (req_id, bot_id),
+        )
+        db.commit()
+    if cur.rowcount == 0:
+        raise HTTPException(status_code=404, detail="So'rov topilmadi yoki allaqachon bajarilgan.")
+    return {"ok": True}
 
 
 @app.post("/api/bots/{bot_id}/products")
