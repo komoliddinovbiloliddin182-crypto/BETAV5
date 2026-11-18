@@ -21,6 +21,9 @@ a{color:#9bb0ff}
 .user-chip .admin-badge{font-size:10px;font-weight:700;color:var(--amber);background:#3a2a0e;border:1px solid #6b4a16;padding:2px 8px;border-radius:20px}
 .btn-logout{background:#1a2336;color:#cbd7f2;padding:8px 14px;border-radius:10px;font-size:12px;border:1px solid var(--line)}
 .btn-logout:hover{background:#243049;color:#fff}
+.announce-banner{margin:14px max(5vw,22px) 0;padding:13px 18px;border-radius:13px;border:1px solid #6b4a16;background:linear-gradient(100deg,#3a2a0e,#2a1f0a);color:#ffd97a;font-size:14px;line-height:1.5;display:none;align-items:flex-start;gap:10px}
+.announce-banner .ab-ico{font-size:18px;flex-shrink:0}
+.announce-banner .ab-txt{flex:1;white-space:pre-wrap;word-break:break-word}
 main{max-width:1180px;margin:auto;padding:36px 24px 80px}
 .hero{display:flex;justify-content:space-between;align-items:flex-end;gap:24px;margin-bottom:28px}
 .eyebrow{color:var(--cyan);font-size:11px;font-weight:800;letter-spacing:2px;text-transform:uppercase}
@@ -232,6 +235,7 @@ main{max-width:1180px;margin:auto;padding:36px 24px 80px}
   </div>
 </header>
 <main>
+<div class="announce-banner" id="announceBanner"><span class="ab-ico">📢</span><span class="ab-txt" id="announceText"></span></div>
 
 <!-- AUTH VIEW -->
 <section id="authView" class="auth-wrap">
@@ -269,7 +273,7 @@ main{max-width:1180px;margin:auto;padding:36px 24px 80px}
     <div>
       <div class="eyebrow">TELEGRAM BOT PLATFORMASI</div>
       <h1>G’oyangizni botga <em>aylantiring.</em></h1>
-      <p>Shablonni tanlang, BotFather tokenini ulang — bot darhol ishga tushadi. Do’kon, yordam markazi, quiz yoki obuna botini daqiqalar ichida yarating.</p>
+      <p>Shablonni tanlang, BotFather tokenini ulang — bot darhol ishga tushadi. 30 ta tayyor shablon: do’kon, restoran, dorixona, navbat, qayta aloqa, konsultatsiya va boshqalar.</p>
     </div>
     <div class="hero-chip">✦ 3 kunlik bepul sinov · Karta talab qilinmaydi</div>
   </div>
@@ -289,6 +293,31 @@ main{max-width:1180px;margin:auto;padding:36px 24px 80px}
         <button class="template" data-template="quiz"><span class="ico">🧠</span><b>Quiz / Test</b><small>5 savol, ball va natijalar</small></button>
         <button class="template" data-template="sub"><span class="ico">🔐</span><b>Obuna boti</b><small>Kanalga obuna yo’riqnomasi</small></button>
         <button class="template" data-template="navbat"><span class="ico">🎫</span><b>Navbat boti</b><small>Sartarosh, shifokor va h.k. uchun navbat tizimi</small></button>
+        <button class="template" data-template="feedback"><span class="ico">⭐</span><b>Fikr-mulohaza</b><small>Mijozlar baholaydi va izoh qoldiradi</small></button>
+        <button class="template" data-template="news"><span class="ico">📨</span><b>Yangiliklar boti</b><small>Obunachilarga yangilik tarqatish</small></button>
+        <button class="template" data-template="poll"><span class="ico">📊</span><b>So'rovnomalar</b><small>Savol + variantlar, ovoz va natija</small></button>
+        <button class="template" data-template="info"><span class="ico">ℹ️</span><b>Biznes ma'lumoti</b><small>Haqida, xizmatlar, aloqa va manzil</small></button>
+        <button class="template" data-template="restaurant"><span class="ico">🍽️</span><b>Restoran/kafe</b><small>Taomnoma, buyurtma va bron</small></button>
+        <button class="template" data-template="pharmacy"><span class="ico">💊</span><b>Dorixona</b><small>Dori-darmon katalogi va buyurtma</small></button>
+        <button class="template" data-template="market"><span class="ico">🥬</span><b>Oziq-ovqat</b><small>Mahsulotlar va yetkazib berish</small></button>
+        <button class="template" data-template="flowers"><span class="ico">💐</span><b>Gul do'koni</b><small>Gul va sovg'alar buyurtmasi</small></button>
+        <button class="template" data-template="auto"><span class="ico">🔩</span><b>Avtozapchast</b><small>Zapchast katalogi va buyurtma</small></button>
+        <button class="template" data-template="books"><span class="ico">📚</span><b>Kitob do'koni</b><small>Kitob katalogi va buyurtma</small></button>
+        <button class="template" data-template="callback"><span class="ico">📞</span><b>Qayta aloqa</b><small>Mijoz telefon qoldiradi, siz qo'ng'iroq qilasiz</small></button>
+        <button class="template" data-template="consultation"><span class="ico">🩺</span><b>Konsultatsiya</b><small>Bepul maslahat so'rash</small></button>
+        <button class="template" data-template="complaint"><span class="ico">📝</span><b>Shikoyat/Taklif</b><small>Fikr-mulohaza yig'ish</small></button>
+        <button class="template" data-template="quote"><span class="ico">💰</span><b>Narx so'rash</b><small>Baho/narx so'rash</small></button>
+        <button class="template" data-template="delivery"><span class="ico">🚚</span><b>Yetkazib berish</b><small>Buyurtma yetkazib berish</small></button>
+        <button class="template" data-template="measure"><span class="ico">📐</span><b>O'lchovga kelish</b><small>Mebel/deraza o'lchovi</small></button>
+        <button class="template" data-template="master"><span class="ico">🔧</span><b>Usta chaqirish</b><small>Santexnik, elektr va h.k.</small></button>
+        <button class="template" data-template="reservation"><span class="ico">📅</span><b>Bron qilish</b><small>Restoran/zal bron</small></button>
+        <button class="template" data-template="visit"><span class="ico">🚪</span><b>Tashrif</b><small>Tashrif vaqtini buyurtish</small></button>
+        <button class="template" data-template="application"><span class="ico">📄</span><b>Ariza</b><small>Onlayn ariza/yozilish</small></button>
+        <button class="template" data-template="repair"><span class="ico">🛠️</span><b>Ta'mirga qabul</b><small>Texnika ta'miri</small></button>
+        <button class="template" data-template="cleaning"><span class="ico">🧹</span><b>Tozalash xizmati</b><small>Kliniy/tozalash xizmati</small></button>
+        <button class="template" data-template="tour"><span class="ico">✈️</span><b>Tur/Ekskursiya</b><small>Turga yozilish</small></button>
+        <button class="template" data-template="estimate"><span class="ico">🧮</span><b>Smeta</b><small>Smeta/hisob so'rash</small></button>
+        <button class="template" data-template="partner"><span class="ico">🤝</span><b>Hamkorlik</b><small>Hamkorlik taklifi</small></button>
       </div>
       <div class="field">
         <label for="botToken">TELEGRAM BOT TOKENI</label>
@@ -421,6 +450,13 @@ main{max-width:1180px;margin:auto;padding:36px 24px 80px}
         <button class="primary" id="saveSettingsBtn" style="max-width:280px;margin-top:16px">💾 Saqlash</button>
         <div id="settingsAlert" class="notice" style="margin-top:12px"></div>
       </div>
+      <div class="panel" style="padding:20px;margin-top:16px">
+        <div class="section-head" style="margin-bottom:14px"><h2 style="font-size:15px">📢 Sayt elani (yangilik)</h2></div>
+        <div class="hint-s" style="margin-bottom:10px">Bu matn sayt tepasida barcha tashrifchilarga ko'rinadi. Bo'sh qoldirsangiz — elan o'chiriladi.</div>
+        <textarea class="form-input" id="setAnnouncement" rows="3" placeholder="Masalan: Yangi navbat boti shabloni qo'shildi! 🔥" style="width:100%;max-width:560px;resize:vertical;font-family:inherit"></textarea>
+        <button class="primary" id="saveAnnouncementBtn" style="max-width:280px;margin-top:12px">📢 Elanni saqlash</button>
+        <div id="announcementAlert" class="notice" style="margin-top:12px"></div>
+      </div>
     </div>
 
     <!-- Broadcasts pane -->
@@ -461,7 +497,7 @@ main{max-width:1180px;margin:auto;padding:36px 24px 80px}
 
 <script>
 const $=id=>document.getElementById(id);
-let token=localStorage.getItem('bb_token'), selectedTemplate='support', myBots=[], adminBots=[], adminUsers=[], adminStats=null, adminOrders=[], adminTickets=[], adminResults=[], currentBot=null, adminTab='stats';
+let token=localStorage.getItem('bb_token'), isAdmin=false, selectedTemplate='support', myBots=[], adminBots=[], adminUsers=[], adminStats=null, adminOrders=[], adminTickets=[], adminResults=[], currentBot=null, adminTab='stats';
 let myBalance=0, myTopups=[], inboxData=null, chatMessages=[], adminTopups=[], topupFilter='all', adminSettings=null, adminBroadcasts=[], adminChats=[], chatPartner=null, pricingInfo=null;
 
 /* ── API yordamchi ── */
@@ -489,7 +525,7 @@ async function apiForm(path,formData){
 
 /* ── Ko’rinish ── */
 function showAuth(){$('authView').style.display='block';$('dashView').style.display='none';$('userBox').style.display='none';}
-function showDash(){$('authView').style.display='none';$('dashView').style.display='block';$('userBox').style.display='flex';loadAll();}
+function showDash(){$('authView').style.display='none';$('dashView').style.display='block';$('userBox').style.display='flex';if(!isAdmin)$('adminSection').style.display='none';loadAll();}
 function showNotice(el,type,msg){el.className='notice show '+type;el.textContent=msg;}
 
 /* ── Auth ── */
@@ -547,16 +583,19 @@ async function doLogout(){
   showAuth();
 }
 
-function setUser(username,isAdmin,balance){
+function setUser(username,adminFlag,balance){
+  isAdmin=!!adminFlag;
   $('userLabel').textContent=username;
   $('adminBadge').style.display=isAdmin?'inline-block':'none';
+  // Mijozlarga admin panel qat'iy ko'rinmasin.
+  $('adminSection').style.display=isAdmin?'block':'none';
   if(typeof balance==='number')updateBalanceUI(balance);
 }
 
 function updateBalanceUI(b){
   myBalance=b;
   $('balanceLabel').textContent=fmtPrice(b);
-  $('balanceChip').style.display = ($('adminBadge').style.display==='inline-block') ? 'none' : 'flex';
+  $('balanceChip').style.display = isAdmin ? 'none' : 'flex';
 }
 
 async function loadMyBalance(){
@@ -616,8 +655,10 @@ async function launchBot(){
 
 /* ── Botlar ro’yxati ── */
 function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
-const TPL_LABEL={support:'Yordam markazi',shop:"Onlayn do’kon",quiz:'Quiz / Test',sub:'Obuna boti',navbat:'Navbat boti'};
-const TPL_ICO={support:'💬',shop:'🛍️',quiz:'🧠',sub:'🔐',navbat:'🎫'};
+const TPL_LABEL={support:'Yordam markazi',shop:"Onlayn do’kon",quiz:'Quiz / Test',sub:'Obuna boti',navbat:'Navbat boti',feedback:'Fikr-mulohaza',news:'Yangiliklar boti',poll:"So'rovnomalar",info:"Biznes ma'lumoti",restaurant:'Restoran/kafe',pharmacy:'Dorixona',market:'Oziq-ovqat',flowers:"Gul do'koni",auto:'Avtozapchast',books:'Kitob do\'koni',callback:'Qayta aloqa',consultation:'Konsultatsiya',complaint:'Shikoyat/Taklif',quote:'Narx so\'rash',delivery:'Yetkazib berish',measure:'O\'lchovga kelish',master:'Usta chaqirish',reservation:'Bron qilish',visit:'Tashrif',application:'Ariza',repair:"Ta'mirga qabul",cleaning:'Tozalash xizmati',tour:'Tur/Ekskursiya',estimate:'Smeta',partner:'Hamkorlik'};
+const TPL_ICO={support:'💬',shop:'🛍️',quiz:'🧠',sub:'🔐',navbat:'🎫',feedback:'⭐',news:'📨',poll:'📊',info:'ℹ️',restaurant:'🍽️',pharmacy:'💊',market:'🥬',flowers:'💐',auto:'🔩',books:'📚',callback:'📞',consultation:'🩺',complaint:'📝',quote:'💰',delivery:'🚚',measure:'📐',master:'🔧',reservation:'📅',visit:'🚪',application:'📄',repair:'🛠️',cleaning:'🧹',tour:'✈️',estimate:'🧮',partner:'🤝'};
+const CATALOG_TPLS=['shop','restaurant','pharmacy','market','flowers','auto','books'];
+const REQUEST_TPLS=['callback','consultation','complaint','quote','delivery','measure','master','reservation','visit','application','repair','cleaning','tour','estimate','partner'];
 
 function botRowHtml(b,showOwner){
   const active=b.is_active;
@@ -887,7 +928,7 @@ async function loadAdminAll(){
 
 async function loadAll(){
   await Promise.all([loadMyBots(),loadStats(),loadMyBalance(),loadPricing(),updateInboxBadge()]);
-  if($('adminBadge').style.display!=='none'){
+  if(isAdmin){
     $('adminSection').style.display='block';
     await switchAdminTab(adminTab);
     // Badge’larni yangilash (faqat faol tab bo’lmasa — dublikat oldini olamiz).
@@ -903,7 +944,7 @@ async function deleteBot(id,name){
     const {ok,data}=await api(`/api/bots/${id}`,{method:'DELETE'});
     if(!ok)throw new Error(data.detail||'O\'chirilmadi.');
     await loadMyBots();
-    if($('adminBadge').style.display!=='none'){await loadAdminBots();if(adminTab==='stats')await loadAdminStats();}
+    if(isAdmin){await loadAdminBots();if(adminTab==='stats')await loadAdminStats();}
   }catch(e){alert('Xatolik: '+(e.message||'O\'chirilmadi.'));}
 }
 
@@ -914,13 +955,46 @@ $('modalOverlay').addEventListener('click',e=>{if(e.target===$('modalOverlay'))c
 function closeModal(){$('modalOverlay').classList.remove('show');currentBot=null;}
 function openModal(title){$('modalTitle').textContent=title;$('modalBody').innerHTML='<div class="empty">Yuklanmoqda...</div>';$('modalOverlay').classList.add('show');}
 
+async function loadRequests(id,template){
+  const label=TPL_LABEL[template]||template;
+  try{
+    const {ok,data}=await api(`/api/bots/${id}/requests`);
+    if(!ok)throw 0;
+    if(!data||!data.length){$('modalBody').innerHTML='<div class="empty">📋 Hozircha so\'rovlar yo\'q.<br><br>Mijozlar botda "📝 So\'rov yuborish" tugmasi orqali so\'rov yuboradi.</div>';return;}
+    const rows=data.map(r=>{
+      const fields=Object.entries(r.data||{}).filter(([k,v])=>v).map(([k,v])=>`<div class="muted" style="margin:2px 0"><b>${esc(k)}:</b> ${esc(v)}</div>`).join('');
+      const stStyle=r.status==='done'?'background:#0e2b33;color:#4fd1c5;border:1px solid #1f5a66':'background:#2a1f0a;color:#ffd97a;border:1px solid #5a3f12';
+      const stTxt=r.status==='done'?'✅ Bajarildi':'🆕 Yangi';
+      const btn=r.status==='new'?`<button class="btn-ghost" onclick="markReqDone(${id},${r.id})" style="padding:7px 14px;font-size:12px">✅ Bajarildi</button>`:'';
+      return `<div style="border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:10px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;flex-wrap:wrap;gap:6px">
+          <b>📋 So'rov #${r.id}</b>
+          <span style="font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;${stStyle}">${stTxt}</span>
+        </div>
+        <div class="muted" style="margin-bottom:6px;font-size:12px">👤 ${esc(r.tg_username||'mijoz')} · 🕒 ${esc((r.created_at||'').slice(0,16))}</div>
+        ${fields}
+        <div style="margin-top:8px">${btn}</div>
+      </div>`;
+    }).join('');
+    $('modalBody').innerHTML=`<div class="modal-tabs"><div class="modal-tab active">📋 ${esc(label)} — so'rovlar (${data.length})</div></div><div style="margin-top:12px">${rows}</div>`;
+  }catch(e){$('modalBody').innerHTML='<div class="empty">Yuklashda xatolik. Qayta urinib ko\'ring.</div>';}
+}
+window.markReqDone=async function(botId,reqId){
+  try{
+    const {ok}=await api(`/api/bots/${botId}/requests/${reqId}/done`,{method:'POST'});
+    if(!ok)throw 0;
+    await loadRequests(botId,currentBot.template);
+  }catch(e){alert('Bajarilmadi.');}
+};
+
 window.manageBot=async function(id,template){
   currentBot={id,template};
   const label=TPL_LABEL[template]||template;
   openModal(`@${label} — boshqarish`);
-  if(template==='shop')return loadShopData(id);
+  if(CATALOG_TPLS.includes(template))return loadShopData(id);
   if(template==='support')return loadTickets(id);
   if(template==='quiz')return loadResults(id);
+  if(REQUEST_TPLS.includes(template))return loadRequests(id,template);
   $('modalBody').innerHTML=`<div class="empty">Bu shablon uchun alohida boshqaruv paneli yo’q. Bot Telegramda to’liq ishlaydi.</div>`;
 };
 
@@ -1355,8 +1429,34 @@ $('adminChatSearch')&&$('adminChatSearch').addEventListener('input',renderAdminC
 $('saveSettingsBtn').addEventListener('click',saveSettings);
 $('sendBroadcastBtn').addEventListener('click',sendBroadcast);
 
+/* ── Sayt elani (announcements) ── */
+async function loadAnnouncement(){
+  try{
+    const r=await fetch('/api/announcements');if(!r.ok)return;
+    const data=await r.json();
+    const txt=(data.text||'').trim();
+    if(txt){$('announceText').textContent=txt;$('announceBanner').style.display='flex';}
+    else{$('announceBanner').style.display='none';}
+    const ta=$('setAnnouncement');if(ta)ta.value=txt;
+  }catch(e){}
+}
+async function saveAnnouncement(){
+  const btn=$('saveAnnouncementBtn');btn.disabled=true;btn.textContent='⏳...';
+  const alert=$('announcementAlert');
+  const txt=($('setAnnouncement').value||'').trim();
+  try{
+    const {ok,data}=await api('/api/admin/announcements',{method:'POST',body:JSON.stringify({text:txt})});
+    if(!ok)throw new Error(data.detail||'Saqlanmadi.');
+    showNotice(alert,'success','✓ Elan saqlandi.');
+    loadAnnouncement();
+  }catch(e){showNotice(alert,'error','❌ '+(e.message||'Saqlanmadi.'));}
+  finally{btn.disabled=false;btn.textContent='📢 Elanni saqlash';}
+}
+$('saveAnnouncementBtn').addEventListener('click',saveAnnouncement);
+
 /* ── Init ── */
 checkSession();
+loadAnnouncement();
 </script>
 </body>
 </html>
