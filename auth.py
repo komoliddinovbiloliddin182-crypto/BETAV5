@@ -114,4 +114,30 @@ async def get_current_user(
     """Bearer token orqali joriy foydalanuvchini qaytaradi. Bloklanganlar rad etiladi."""
     if not credentials:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Tizimga kirilmagan.")
-    to
+    token = credentials.credentials
+    async with db_lock:
+        row = db.execute(
+            """SELECT u.id, u.username, u.is_admin, u.is_blocked, u.balance,
+                      u.ever_created_bot, u.created_at, s.expires_at
+               FROM sessions s JOIN users u ON s.user_id = u.id
+               WHERE s.token=?""",
+            (token,),
+        ).fetchone()
+        if not row:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Sessiya topilmadi. Qayta kiring.")
+        if datetime.utcnow() > datetime.fromisoformat(row["expires_at"]):
+            db.execute("DELETE FROM sessions WHERE token=?", (token,))
+            db.commit()
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Sessiya muddati tugagan.")
+        if row["is_blocked"]:
+            # Bloklangan foydalanuvchining sessiyasini darhol o'chiramiz.
+            db.execute("DELETE FROM sessions WHERE user_id=?", (row["id"],))
+            db.commit()
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Hisobingiz bloklangan.")
+    return row
+
+
+async def require_admin(user: Any = Depends(get_current_user)) -> Any:
+    if not user["is_admin"]:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Administrator huquqi kerak.")
+    return user
