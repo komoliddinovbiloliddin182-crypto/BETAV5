@@ -91,13 +91,17 @@ SETTING_DEFAULTS = {
 }
 
 
-VALID_TEMPLATES = {"support", "shop", "quiz", "sub", "navbat"}
+VALID_TEMPLATES = {"support", "shop", "quiz", "sub", "navbat", "feedback", "news", "poll", "info"}
 TEMPLATE_LABELS = {
     "support": "Yordam markazi",
     "shop": "Onlayn do'kon",
     "quiz": "Quiz / Test",
     "sub": "Obuna boti",
     "navbat": "Navbat boti",
+    "feedback": "Fikr-mulohaza",
+    "news": "Yangiliklar boti",
+    "poll": "So'rovnomalar",
+    "info": "Biznes ma'lumoti",
 }
 
 running_bots: dict[str, tuple[asyncio.Task, Bot]] = {}
@@ -280,6 +284,27 @@ async def public_stats():
         total = db.execute("SELECT COUNT(*) AS c FROM managed_bots").fetchone()["c"]
         active = db.execute("SELECT COUNT(*) AS c FROM managed_bots WHERE is_active=1").fetchone()["c"]
     return {"total_bots": total, "active_bots": active, "templates": len(VALID_TEMPLATES)}
+
+
+# ── Sayt yangiliklari / elanlar (announcements) ──
+
+@app.get("/api/announcements")
+async def get_announcements():
+    """Ommaviy: sayt tepasida ko'rsatiladigan elan matni."""
+    text = get_setting("site_announcement", "")
+    return {"text": text}
+
+
+class AnnouncementRequest(BaseModel):
+    text: str = Field(max_length=2000)
+
+
+@app.post("/api/admin/announcements")
+async def set_announcements(req: AnnouncementRequest, user=Depends(require_admin)):
+    """Admin: sayt elanini o'rnatadi yoki tozalaydi (bo'sh matn = o'chirish)."""
+    text = req.text.strip()
+    set_setting("site_announcement", text)
+    return {"ok": True, "text": text}
 
 
 # ── Autentifikatsiya ──
