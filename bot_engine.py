@@ -96,7 +96,7 @@ def reply_menu(template: str):
         kb.button(text="💬 Savol yuborish")
         kb.button(text="📋 Mening so'rovlarim")
         kb.button(text="ℹ️ Yordam")
-    elif template == "shop":
+    elif template == "shop" or template in CATALOG_TEMPLATES:
         kb.button(text="🛍️ Katalog")
         kb.button(text="🛒 Savat")
         kb.button(text="📦 Buyurtmalarim")
@@ -109,23 +109,68 @@ def reply_menu(template: str):
         kb.button(text="📢 Obuna haqida")
         kb.button(text="✅ Obunani tekshirish")
         kb.button(text="☎️ Admin bilan aloqa")
-    else:  # navbat — mijoz menyu
+    elif template == "navbat":
         kb.button(text="🎫 Navbat olish")
         kb.button(text="📅 Mening vaqtim")
+        kb.button(text="ℹ️ Ma'lumot")
+    elif template == "feedback":
+        kb.button(text="⭐ Baholash")
+        kb.button(text="📋 Mening baholarim")
+        kb.button(text="ℹ️ Ma'lumot")
+    elif template == "news":
+        kb.button(text="📢 Obuna bo'lish")
+        kb.button(text="🔕 Obunani bekor qilish")
+        kb.button(text="ℹ️ Ma'lumot")
+    elif template == "poll":
+        kb.button(text="📊 Ovoz berish")
+        kb.button(text="📈 Natijalar")
+        kb.button(text="ℹ️ Ma'lumot")
+    elif template == "info":
+        kb.button(text="ℹ️ Biznes haqida")
+        kb.button(text="📞 Aloqa")
+        kb.button(text="📍 Manzil")
+    elif template in REQUEST_TEMPLATES:
+        kb.button(text="📝 So'rov yuborish")
+        kb.button(text="📋 Mening so'rovlarim")
+        kb.button(text="ℹ️ Ma'lumot")
+    kb.adjust(2)
+    return kb.as_markup(resize_keyboard=True)
+
+
+def admin_menu(template: str) -> "types.ReplyKeyboardMarkup":
+    """Admin shablonlari (navbat/feedback/news/poll/info) uchun admin reply-klaviatura."""
+    kb = ReplyKeyboardBuilder()
+    if template == "navbat":
+        kb.button(text="⚙️ Sozlash")
+        kb.button(text="📋 Bugungi navbat")
+        kb.button(text="📊 Statistika")
+        kb.button(text="ℹ️ Ma'lumot")
+    elif template == "feedback":
+        kb.button(text="⭐ Barcha fikrlar")
+        kb.button(text="📊 O'rtacha ball")
+        kb.button(text="ℹ️ Ma'lumot")
+    elif template == "news":
+        kb.button(text="📨 Yangilik yuborish")
+        kb.button(text="👥 Obunachilar")
+        kb.button(text="ℹ️ Ma'lumot")
+    elif template == "poll":
+        kb.button(text="📝 So'rov yaratish")
+        kb.button(text="📊 Faol so'rov")
+        kb.button(text="ℹ️ Ma'lumot")
+    elif template == "info":
+        kb.button(text="⚙️ Ma'lumot sozlash")
+        kb.button(text="👁 Ko'rish")
+        kb.button(text="ℹ️ Ma'lumot")
+    elif template in REQUEST_TEMPLATES:
+        kb.button(text="📋 So'rovlar")
         kb.button(text="ℹ️ Ma'lumot")
     kb.adjust(2)
     return kb.as_markup(resize_keyboard=True)
 
 
 def admin_reply_menu() -> "types.ReplyKeyboardMarkup":
-    """Navbat boti admini uchun reply-klaviatura."""
-    kb = ReplyKeyboardBuilder()
-    kb.button(text="⚙️ Sozlash")
-    kb.button(text="📋 Bugungi navbat")
-    kb.button(text="📊 Statistika")
-    kb.button(text="ℹ️ Ma'lumot")
-    kb.adjust(2)
-    return kb.as_markup(resize_keyboard=True)
+    """Eskicha alias — navbat admin menyu (avvalgi chaqiruvlar uchun)."""
+    return admin_menu("navbat")
 
 
 # ───────────────────────── SUPPORT BOT ─────────────────────────
@@ -478,6 +523,443 @@ async def navbat_start_handler(message: types.Message, bot_id: int, states: dict
     )
 
 
+# ───────────────────────── GENERIC ADMIN TEMPLATES ─────────────────────────
+# feedback / news / poll / info shablonlari ham navbat kabi "birinchi /start = admin"
+# printsipiga ishlaydi. bot_admins jadvali umumiy (har bir bot uchun bitta admin).
+
+ADMIN_TEMPLATES = {"navbat", "feedback", "news", "poll", "info"}
+
+
+async def get_bot_admin(bot_id: int) -> dict | None:
+    """Bot adminini qaytaradi (umumiy — barcha admin shablonlari uchun)."""
+    async with db_lock:
+        row = db.execute("SELECT admin_id, admin_username FROM bot_admins WHERE bot_id=?", (bot_id,)).fetchone()
+    return dict(row) if row else None
+
+
+async def set_bot_admin(bot_id: int, admin_id: int, admin_username: str) -> int:
+    """Birinchi adminni yozadi; agar allaqachon bo'lsa, eski admin_id qaytaradi."""
+    async with db_lock:
+        existing = db.execute("SELECT admin_id FROM bot_admins WHERE bot_id=?", (bot_id,)).fetchone()
+        if existing:
+            return existing["admin_id"]
+        db.execute(
+            "INSERT INTO bot_admins (bot_id, admin_id, admin_username, created_at) VALUES (?, ?, ?, ?)",
+            (bot_id, admin_id, admin_username, datetime.utcnow().isoformat()),
+        )
+        db.commit()
+    return admin_id
+
+
+# Birinchi /start — admin salomi (har bir admin shabloni uchun).
+ADMIN_FIRST_WELCOME = {
+    "feedback": (
+        "🎉 Tabriklaymiz! Siz bu botning ADMINIsiz.\n\n"
+        "Birinchi bo'lib ishga tushirgan foydalanuvchi admin bo'ldi.\n\n"
+        "Mijozlar sizning biznesingizni baholaydi (1-5 ⭐) va izoh qoldiradi.\n"
+        "Siz \"⭐ Barcha fikrlar\" va \"📊 O'rtacha ball\" orqali fikrlarni ko'rasiz."
+    ),
+    "news": (
+        "🎉 Tabriklaymiz! Siz bu botning ADMINIsiz.\n\n"
+        "Birinchi bo'lib ishga tushirgan foydalanuvchi admin bo'ldi.\n\n"
+        "Mijozlar \"📢 Obuna bo'lish\" tugmasini bosib obunachi bo'ladi.\n"
+        "Siz \"📨 Yangilik yuborish\" orqali matn yuborasiz — u barcha obunachilarga tarqatiladi."
+    ),
+    "poll": (
+        "🎉 Tabriklaymiz! Siz bu botning ADMINIsiz.\n\n"
+        "Birinchi bo'lib ishga tushirgan foydalanuvchi admin bo'ldi.\n\n"
+        "Siz \"📝 So'rov yaratish\" orqali savol va variantlarni kiritasiz.\n"
+        "Mijozlar ovoz beradi va natijani ko'radi."
+    ),
+    "info": (
+        "🎉 Tabriklaymiz! Siz bu botning ADMINIsiz.\n\n"
+        "Birinchi bo'lib ishga tushirgan foydalanuvchi admin bo'ldi.\n\n"
+        "Siz \"⚙️ Ma'lumot sozlash\" orqali biznes nomi, haqida, xizmatlar, telefon, "
+        "manzil va ish vaqtini kiritasiz. Mijozlar buni ko'radi."
+    ),
+}
+
+ADMIN_RETURN_WELCOME = {
+    "feedback": "👋 Admin paneliga xush kelibsiz!\n\n⭐ Barcha fikrlar · 📊 O'rtacha ball",
+    "news": "👋 Admin paneliga xush kelibsiz!\n\n📨 Yangilik yuborish · 👥 Obunachilar",
+    "poll": "👋 Admin paneliga xush kelibsiz!\n\n📝 So'rov yaratish · 📊 Faol so'rov",
+    "info": "👋 Admin paneliga xush kelibsiz!\n\n⚙️ Ma'lumot sozlash · 👁 Ko'rish",
+}
+
+CUSTOMER_GREETING = {
+    "feedback": (
+        "Assalomu alaykum! ⭐\nBiznesni baholash botiga xush kelibsiz.\n\n"
+        "\"⭐ Baholash\" tugmasini bosing va 1-5 yulduz baho qoldiring."
+    ),
+    "news": (
+        "Assalomu alaykum! 📨\nYangiliklar botiga xush kelibsiz.\n\n"
+        "\"📢 Obuna bo'lish\" tugmasini bosing va yangiliklardan xabardor bo'ling."
+    ),
+    "poll": (
+        "Assalomu alaykum! 📊\nSo'rovnomalar botiga xush kelibsiz.\n\n"
+        "\"📊 Ovoz berish\" tugmasini bosing va fikringizni bildiring."
+    ),
+    "info": (
+        "Assalomu alaykum! ℹ️\nBiznes ma'lumot botiga xush kelibsiz.\n\n"
+        "\"ℹ️ Biznes haqida\" tugmasini bosing."
+    ),
+}
+
+
+async def first_admin_start(message: types.Message, bot_id: int, states: dict, template: str) -> None:
+    """feedback/news/poll/info uchun /start: birinchi foydalanuvchi admin bo'ladi."""
+    uid = message.from_user.id if message.from_user else 0
+    uname = (
+        ("@" + message.from_user.username) if (message.from_user and message.from_user.username)
+        else (message.from_user.full_name if message.from_user else "Admin")
+    )
+    admin = await get_bot_admin(bot_id)
+    states.pop(uid, None)
+    if admin is None:
+        await set_bot_admin(bot_id, uid, uname)
+        await message.answer(ADMIN_FIRST_WELCOME[template], reply_markup=admin_menu(template))
+        return
+    if admin["admin_id"] == uid:
+        await message.answer(ADMIN_RETURN_WELCOME[template], reply_markup=admin_menu(template))
+        return
+    await message.answer(CUSTOMER_GREETING[template], reply_markup=reply_menu(template))
+
+
+# ── FEEDBACK helpers ──
+async def feedback_save(bot_id: int, tg_user_id: int, tg_username: str, rating: int, comment: str) -> int:
+    async with db_lock:
+        cur = db.execute(
+            "INSERT INTO feedback_entries (bot_id, tg_user_id, tg_username, rating, comment, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (bot_id, tg_user_id, tg_username, rating, comment, datetime.utcnow().isoformat()),
+        )
+        db.commit()
+        return cur.lastrowid
+
+
+async def feedback_list_user(bot_id: int, tg_user_id: int) -> list:
+    async with db_lock:
+        rows = db.execute(
+            "SELECT rating, comment, created_at FROM feedback_entries WHERE bot_id=? AND tg_user_id=? ORDER BY id DESC LIMIT 10",
+            (bot_id, tg_user_id),
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+async def feedback_list_all(bot_id: int, limit: int = 15) -> list:
+    async with db_lock:
+        rows = db.execute(
+            "SELECT rating, comment, tg_username, created_at FROM feedback_entries WHERE bot_id=? ORDER BY id DESC LIMIT ?",
+            (bot_id, limit),
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+async def feedback_average(bot_id: int) -> dict:
+    async with db_lock:
+        row = db.execute(
+            "SELECT COUNT(*) AS c, AVG(rating) AS avg FROM feedback_entries WHERE bot_id=?",
+            (bot_id,),
+        ).fetchone()
+    return {"count": row["c"] if row else 0, "avg": round(row["avg"], 2) if row and row["avg"] else 0}
+
+
+# ── NEWS helpers ──
+async def news_subscribe(bot_id: int, tg_user_id: int, tg_username: str) -> bool:
+    """Obuna qo'shadi. Agar allaqachon bo'lsa, False qaytaradi."""
+    async with db_lock:
+        existing = db.execute("SELECT id FROM news_subscribers WHERE bot_id=? AND tg_user_id=?", (bot_id, tg_user_id)).fetchone()
+        if existing:
+            return False
+        db.execute(
+            "INSERT INTO news_subscribers (bot_id, tg_user_id, tg_username, subscribed_at) VALUES (?, ?, ?, ?)",
+            (bot_id, tg_user_id, tg_username, datetime.utcnow().isoformat()),
+        )
+        db.commit()
+    return True
+
+
+async def news_unsubscribe(bot_id: int, tg_user_id: int) -> bool:
+    """Obunani o'chiradi. Agar obuna yo'q bo'lsa, False qaytaradi."""
+    async with db_lock:
+        cur = db.execute("DELETE FROM news_subscribers WHERE bot_id=? AND tg_user_id=?", (bot_id, tg_user_id))
+        db.commit()
+    return cur.rowcount > 0
+
+
+async def news_subscriber_count(bot_id: int) -> int:
+    async with db_lock:
+        row = db.execute("SELECT COUNT(*) AS c FROM news_subscribers WHERE bot_id=?", (bot_id,)).fetchone()
+    return row["c"] if row else 0
+
+
+async def news_subscriber_ids(bot_id: int) -> list:
+    async with db_lock:
+        rows = db.execute("SELECT tg_user_id FROM news_subscribers WHERE bot_id=?", (bot_id,)).fetchall()
+    return [r["tg_user_id"] for r in rows]
+
+
+async def news_create_post(bot_id: int, body: str) -> int:
+    async with db_lock:
+        cur = db.execute(
+            "INSERT INTO news_posts (bot_id, body, sent_count, created_at) VALUES (?, ?, 0, ?)",
+            (bot_id, body, datetime.utcnow().isoformat()),
+        )
+        db.commit()
+        return cur.lastrowid
+
+
+async def news_mark_sent(post_id: int, sent_count: int) -> None:
+    async with db_lock:
+        db.execute("UPDATE news_posts SET sent_count=? WHERE id=?", (sent_count, post_id))
+        db.commit()
+
+
+# ── POLL helpers ──
+async def poll_create(bot_id: int, question: str, options: list) -> int:
+    """Yangi so'rov yaratadi, eski faol so'rovni o'chiradi (faqat bitta faol bo'lsin)."""
+    async with db_lock:
+        db.execute("UPDATE polls SET is_active=0 WHERE bot_id=? AND is_active=1", (bot_id,))
+        cur = db.execute(
+            "INSERT INTO polls (bot_id, question, options_json, is_active, created_at) VALUES (?, ?, ?, 1, ?)",
+            (bot_id, question, json.dumps(options, ensure_ascii=False), datetime.utcnow().isoformat()),
+        )
+        db.commit()
+        return cur.lastrowid
+
+
+async def poll_get_active(bot_id: int) -> dict | None:
+    async with db_lock:
+        row = db.execute("SELECT * FROM polls WHERE bot_id=? AND is_active=1 ORDER BY id DESC LIMIT 1", (bot_id,)).fetchone()
+    return dict(row) if row else None
+
+
+async def poll_vote(poll_id: int, tg_user_id: int, choice: int) -> bool:
+    """Ovoz qo'shadi. Agar allaqachon ovoz bergan bo'lsa, False qaytaradi."""
+    async with db_lock:
+        existing = db.execute("SELECT id FROM poll_votes WHERE poll_id=? AND tg_user_id=?", (poll_id, tg_user_id)).fetchone()
+        if existing:
+            return False
+        db.execute(
+            "INSERT INTO poll_votes (poll_id, tg_user_id, choice, created_at) VALUES (?, ?, ?, ?)",
+            (poll_id, tg_user_id, choice, datetime.utcnow().isoformat()),
+        )
+        db.commit()
+    return True
+
+
+async def poll_results(poll_id: int) -> list:
+    async with db_lock:
+        rows = db.execute(
+            "SELECT choice, COUNT(*) AS c FROM poll_votes WHERE poll_id=? GROUP BY choice ORDER BY choice",
+            (poll_id,),
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+# ── INFO helpers ──
+async def info_get_settings(bot_id: int) -> dict:
+    async with db_lock:
+        row = db.execute("SELECT * FROM info_settings WHERE bot_id=?", (bot_id,)).fetchone()
+        if not row:
+            db.execute(
+                "INSERT INTO info_settings (bot_id, business_name, about, services, phone, address, work_hours, updated_at) "
+                "VALUES (?, 'Biznes', '', '', '', '', '', ?)",
+                (bot_id, datetime.utcnow().isoformat()),
+            )
+            db.commit()
+            row = db.execute("SELECT * FROM info_settings WHERE bot_id=?", (bot_id,)).fetchone()
+    return dict(row)
+
+
+async def info_update_settings(bot_id: int, fields: dict) -> None:
+    async with db_lock:
+        db.execute(
+            "UPDATE info_settings SET business_name=?, about=?, services=?, phone=?, address=?, work_hours=?, updated_at=? "
+            "WHERE bot_id=?",
+            (
+                fields.get("business_name", "Biznes"),
+                fields.get("about", ""),
+                fields.get("services", ""),
+                fields.get("phone", ""),
+                fields.get("address", ""),
+                fields.get("work_hours", ""),
+                datetime.utcnow().isoformat(),
+                bot_id,
+            ),
+        )
+        db.commit()
+
+
+# ───────────────────────── REQUEST ENGINE (15 biznes shabloni) ─────────────────────────
+# Har xil bizneslar uchun "so'rov yig'ish" shablonlari — bitta umumiy engine bilan ishlaydi.
+# Mijoz formani to'ldiradi (maydonlar ketma-ket) → contact_requests jadvaliga yoziladi →
+# adminga xabar boradi. Admin "📋 So'rovlar" orqali barchasini ko'radi va ✅ belgilaydi.
+
+REQUEST_TEMPLATES: dict[str, dict] = {
+    "callback": {
+        "label": "Qayta aloqa",
+        "ico": "📞",
+        "greeting": "Assalomu alaykum! 📞\nQayta aloqa botiga xush kelibsiz.\n\"📝 So'rov yuborish\" tugmasini bosing — biz sizga qo'ng'iroq qilamiz.",
+        "fields": [("name", "✍️ Ismingizni kiriting:"), ("phone", "📞 Telefon raqamingizni kiriting:")],
+    },
+    "consultation": {
+        "label": "Konsultatsiya",
+        "ico": "🩺",
+        "greeting": "Assalomu alaykum! 🩺\nBepul konsultatsiya botiga xush kelibsiz.\n\"📝 So'rov yuborish\" tugmasini bosing — mutaxassis siz bilan bog'lanadi.",
+        "fields": [("name", "✍️ Ismingiz:"), ("phone", "📞 Telefon:"), ("question", "❓ Savolingizni yozing:")],
+    },
+    "complaint": {
+        "label": "Shikoyat/Taklif",
+        "ico": "📝",
+        "greeting": "Assalomu alaykum! 📝\nShikoyat va takliflar botiga xush kelibsiz.\n\"📝 So'rov yuborish\" tugmasini bosing.",
+        "fields": [("message", "✍️ Shikoyat yoki taklifingizni yozing:"), ("phone", "📞 Telefon (ixtiyoriy, yoki \"-\"):")],
+    },
+    "quote": {
+        "label": "Narx so'rash",
+        "ico": "💰",
+        "greeting": "Assalomu alaykum! 💰\nNarx/baho so'rash botiga xush kelibsiz.\n\"📝 So'rov yuborish\" tugmasini bosing.",
+        "fields": [("what", "✍️ Nima kerakligini yozing:"), ("phone", "📞 Telefon:")],
+    },
+    "delivery": {
+        "label": "Yetkazib berish",
+        "ico": "🚚",
+        "greeting": "Assalomu alaykum! 🚚\nYetkazib berish buyurtmasi botiga xush kelibsiz.\n\"📝 So'rov yuborish\" tugmasini bosing.",
+        "fields": [("address", "📍 Manzilingizni yozing:"), ("phone", "📞 Telefon:"), ("note", "📝 Izoh (yoki \"-\"):")],
+    },
+    "measure": {
+        "label": "O'lchovga kelish",
+        "ico": "📐",
+        "greeting": "Assalomu alaykum! 📐\nO'lchovga kelish botiga xush kelibsiz (mebel, deraza, h.k.).\n\"📝 So'rov yuborish\" tugmasini bosing.",
+        "fields": [("name", "✍️ Ismingiz:"), ("phone", "📞 Telefon:"), ("when", "🕒 Qachon kelasiz:")],
+    },
+    "master": {
+        "label": "Usta chaqirish",
+        "ico": "🔧",
+        "greeting": "Assalomu alaykum! 🔧\nUsta/mutaxassis chaqirish botiga xush kelibsiz.\n\"📝 So'rov yuborish\" tugmasini bosing.",
+        "fields": [("service", "✍️ Qanday usta kerak (santexnik, elektr, h.k.):"), ("phone", "📞 Telefon:"), ("problem", "🔧 Muammoni yozing:")],
+    },
+    "reservation": {
+        "label": "Bron qilish",
+        "ico": "📅",
+        "greeting": "Assalomu alaykum! 📅\nBron qilish botiga xush kelibsiz (restoran, zal, h.k.).\n\"📝 So'rov yuborish\" tugmasini bosing.",
+        "fields": [("name", "✍️ Ismingiz:"), ("count", "👥 Odamlar soni:"), ("when", "🕒 Vaqt:"), ("phone", "📞 Telefon:")],
+    },
+    "visit": {
+        "label": "Tashrif",
+        "ico": "🚪",
+        "greeting": "Assalomu alaykum! 🚪\nTashrif buyurtish botiga xush kelibsiz.\n\"📝 So'rov yuborish\" tugmasini bosing.",
+        "fields": [("name", "✍️ Ismingiz:"), ("phone", "📞 Telefon:"), ("when", "🕒 Tashrif vaqti:")],
+    },
+    "application": {
+        "label": "Ariza",
+        "ico": "📄",
+        "greeting": "Assalomu alaykum! 📄\nOnlayn ariza botiga xush kelibsiz.\n\"📝 So'rov yuborish\" tugmasini bosing.",
+        "fields": [("name", "✍️ Ismingiz:"), ("phone", "📞 Telefon:"), ("message", "📝 Arizangizni yozing:")],
+    },
+    "repair": {
+        "label": "Ta'mirga qabul",
+        "ico": "🛠️",
+        "greeting": "Assalomu alaykum! 🛠️\nTexnika ta'mirga qabul qilish botiga xush kelibsiz.\n\"📝 So'rov yuborish\" tugmasini bosing.",
+        "fields": [("device", "✍️ Qanday texnika (telefon, TV, h.k.):"), ("problem", "🔧 Muammo:"), ("phone", "📞 Telefon:")],
+    },
+    "cleaning": {
+        "label": "Tozalash xizmati",
+        "ico": "🧹",
+        "greeting": "Assalomu alaykum! 🧹\nTozalash (kliniy) xizmati botiga xush kelibsiz.\n\"📝 So'rov yuborish\" tugmasini bosing.",
+        "fields": [("address", "📍 Manzil:"), ("phone", "📞 Telefon:"), ("note", "📝 Izoh (yoki \"-\"):")],
+    },
+    "tour": {
+        "label": "Tur/Ekskursiya",
+        "ico": "✈️",
+        "greeting": "Assalomu alaykum! ✈️\nTur va ekskursiyalarga yozilish botiga xush kelibsiz.\n\"📝 So'rov yuborish\" tugmasini bosing.",
+        "fields": [("name", "✍️ Ismingiz:"), ("phone", "📞 Telefon:"), ("count", "👥 Odamlar soni:")],
+    },
+    "estimate": {
+        "label": "Smeta",
+        "ico": "🧮",
+        "greeting": "Assalomu alaykum! 🧮\nSmeta/hisob so'rash botiga xush kelibsiz.\n\"📝 So'rov yuborish\" tugmasini bosing.",
+        "fields": [("what", "✍️ Loyiha/ishni yozing:"), ("phone", "📞 Telefon:")],
+    },
+    "partner": {
+        "label": "Hamkorlik",
+        "ico": "🤝",
+        "greeting": "Assalomu alaykum! 🤝\nHamkorlik taklifi botiga xush kelibsiz.\n\"📝 So'rov yuborish\" tugmasini bosing.",
+        "fields": [("name", "✍️ Ismingiz:"), ("company", "🏢 Kompaniya:"), ("phone", "📞 Telefon:"), ("offer", "💼 Taklifingiz:")],
+    },
+}
+
+# Katalog shablonlari — shop dispatcher'ini qayta ishlatadi (faqat greeting farq qiladi).
+CATALOG_TEMPLATES = {
+    "restaurant": {"label": "Restoran/kafe", "ico": "🍽️", "greeting": "Assalomu alaykum! 🍽️\nRestoran botiga xush kelibsiz!\nMenyudan taom tanlang, savatga qo'shing va buyurtma bering."},
+    "pharmacy": {"label": "Dorixona", "ico": "💊", "greeting": "Assalomu alaykum! 💊\nDorixona botiga xush kelibsiz!\nKatalogdan dori tanlang va buyurtma bering."},
+    "market": {"label": "Oziq-ovqat", "ico": "🥬", "greeting": "Assalomu alaykum! 🥬\nMahsulotlar do'koni botiga xush kelibsiz!\nKatalogdan tanlang, savatga qo'shing va buyurtma bering."},
+    "flowers": {"label": "Gul do'koni", "ico": "💐", "greeting": "Assalomu alaykum! 💐\nGul do'koni botiga xush kelibsiz!\nKatalogdan gul tanlang va buyurtma bering."},
+    "auto": {"label": "Avtozapchast", "ico": "🔩", "greeting": "Assalomu alaykum! 🔩\nAvtozapchast botiga xush kelibsiz!\nKatalogdan qismlarni tanlang va buyurtma bering."},
+    "books": {"label": "Kitob do'koni", "ico": "📚", "greeting": "Assalomu alaykum! 📚\nKitob do'koni botiga xush kelibsiz!\nKatalogdan kitob tanlang va buyurtma bering."},
+}
+
+
+async def request_save(bot_id: int, template: str, tg_user_id: int, tg_username: str, data: dict) -> int:
+    async with db_lock:
+        cur = db.execute(
+            "INSERT INTO contact_requests (bot_id, template, tg_user_id, tg_username, data_json, status, created_at) "
+            "VALUES (?, ?, ?, ?, ?, 'new', ?)",
+            (bot_id, template, tg_user_id, tg_username, json.dumps(data, ensure_ascii=False), datetime.utcnow().isoformat()),
+        )
+        db.commit()
+        return cur.lastrowid
+
+
+async def request_list_user(bot_id: int, tg_user_id: int, limit: int = 10) -> list:
+    async with db_lock:
+        rows = db.execute(
+            "SELECT id, data_json, status, created_at FROM contact_requests WHERE bot_id=? AND tg_user_id=? ORDER BY id DESC LIMIT ?",
+            (bot_id, tg_user_id, limit),
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+async def request_list_all(bot_id: int, limit: int = 15) -> list:
+    async with db_lock:
+        rows = db.execute(
+            "SELECT id, data_json, tg_username, status, created_at FROM contact_requests WHERE bot_id=? ORDER BY id DESC LIMIT ?",
+            (bot_id, limit),
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+async def request_mark_done(req_id: int) -> bool:
+    async with db_lock:
+        cur = db.execute("UPDATE contact_requests SET status='done' WHERE id=? AND status='new'", (req_id,))
+        db.commit()
+    return cur.rowcount > 0
+
+
+async def request_start(message: types.Message, bot_id: int, states: dict, template: str) -> None:
+    """Request-engine uchun /start: birinchi foydalanuvchi admin."""
+    uid = message.from_user.id if message.from_user else 0
+    uname = (
+        ("@" + message.from_user.username) if (message.from_user and message.from_user.username)
+        else (message.from_user.full_name if message.from_user else "Admin")
+    )
+    admin = await get_bot_admin(bot_id)
+    states.pop(uid, None)
+    cfg = REQUEST_TEMPLATES[template]
+    if admin is None:
+        await set_bot_admin(bot_id, uid, uname)
+        await message.answer(
+            f"🎉 Tabriklaymiz! Siz bu botning ADMINIsiz.\n\n"
+            f"Bu {cfg['label']} boti. Mijozlar so'rov yuboradi, siz \"📋 So'rovlar\" orqali ko'rasiz.",
+            reply_markup=admin_menu(template),
+        )
+        return
+    if admin["admin_id"] == uid:
+        await message.answer("👋 Admin paneliga xush kelibsiz!\n\n📋 So'rovlar", reply_markup=admin_menu(template))
+        return
+    await message.answer(cfg["greeting"], reply_markup=reply_menu(template))
+
+
 # ───────────────────────── DISPATCHER ─────────────────────────
 
 def build_dispatcher(token: str, template: str, bot_id: int, td: str) -> Dispatcher:
@@ -508,6 +990,14 @@ def build_dispatcher(token: str, template: str, bot_id: int, td: str) -> Dispatc
         if template == "navbat":
             await navbat_start_handler(message, bot_id, states)
             return
+        # feedback / news / poll / info — ham birinchi /start = admin printsipi.
+        if template in ("feedback", "news", "poll", "info"):
+            await first_admin_start(message, bot_id, states, template)
+            return
+        # request-engine shablonlari (callback, consultation, ...) — ham birinchi /start = admin.
+        if template in REQUEST_TEMPLATES:
+            await request_start(message, bot_id, states, template)
+            return
         greetings = {
             "support": "Assalomu alaykum! 👋\nYordam markaziga xush kelibsiz.\nSavolingizni yuboring — biz uni qabul qilamiz va raqami bilan tasdiqlaymiz.",
             "shop": "Assalomu alaykum! 🛍️\nDo'kon botiga xush kelibsiz!\nKatalogdan mahsulot tanlang, savatga qo'shing va buyurtma bering.",
@@ -515,7 +1005,8 @@ def build_dispatcher(token: str, template: str, bot_id: int, td: str) -> Dispatc
             "sub": "Assalomu alaykum! 🔐\nObuna botiga xush kelibsiz. Obuna tartibi haqida ma'lumot oling va obunangizni tekshiring.",
         }
         states.pop(message.from_user.id if message.from_user else 0, None)
-        await message.answer(greetings[template], reply_markup=reply_menu(template))
+        greeting = greetings.get(template) or CATALOG_TEMPLATES.get(template, {}).get("greeting", "Assalomu alaykum!")
+        await message.answer(greeting, reply_markup=reply_menu(template))
 
     @dp.message(Command("help"))
     async def help_cmd(message: types.Message):
@@ -573,8 +1064,8 @@ def build_dispatcher(token: str, template: str, bot_id: int, td: str) -> Dispatc
                     reply_markup=reply_menu(template),
                 )
 
-    # ── SHOP: katalog, savat, buyurtma ──
-    elif template == "shop":
+    # ── SHOP: katalog, savat, buyurtma (catalog-family shablonlari ham shu erda) ──
+    elif template == "shop" or template in CATALOG_TEMPLATES:
         @dp.message(F.text == "🛍️ Katalog")
         async def catalog(message: types.Message):
             if not await trial_ok(message):
@@ -1117,5 +1608,651 @@ def build_dispatcher(token: str, template: str, bot_id: int, td: str) -> Dispatc
                     "Menyudan bo'lim tanlang: 🎫 Navbat olish, 📅 Mening vaqtim, ℹ️ Ma'lumot.",
                     reply_markup=reply_menu("navbat"),
                 )
+
+    # ── FEEDBACK: fikr-mulohaza (birinchi /start = admin) ──
+    elif template == "feedback":
+        async def is_admin(uid: int) -> bool:
+            a = await get_bot_admin(bot_id)
+            return a is not None and a["admin_id"] == uid
+
+        @dp.message(F.text == "⭐ Baholash")
+        async def fb_rate(message: types.Message):
+            if not await trial_ok(message):
+                return
+            uid = message.from_user.id if message.from_user else 0
+            if await is_admin(uid):
+                await message.answer("Admin mijoz sifatida baholay olmaydi.", reply_markup=admin_menu(template))
+                return
+            kb = InlineKeyboardBuilder()
+            for i in range(1, 6):
+                kb.button(text="⭐" * i, callback_data=f"fbr:{i}")
+            kb.adjust(5)
+            states[uid] = {"step": "fb_rating"}
+            await message.answer("⭐ Bahoni tanlang (1-5 yulduz):", reply_markup=kb.as_markup())
+
+        @dp.callback_query(F.data.startswith("fbr:"))
+        async def fb_rating_cb(callback: types.CallbackQuery):
+            uid = callback.from_user.id
+            st = states.get(uid)
+            if not st or st.get("step") != "fb_rating":
+                await callback.answer("Avval \"⭐ Baholash\" tugmasini bosing.")
+                return
+            try:
+                rating = int(callback.data.split(":", 1)[1])
+                if not 1 <= rating <= 5:
+                    raise ValueError()
+            except ValueError:
+                await callback.answer("Noto'g'ri.")
+                return
+            st["rating"] = rating
+            st["step"] = "fb_comment"
+            await callback.answer()
+            await callback.message.edit_text(f"✅ Baho: {'⭐' * rating}\n\n✍️ Endi izohingizni yozing (yoki \"-\" yuboring):")
+
+        @dp.message(F.text == "📋 Mening baholarim")
+        async def fb_my(message: types.Message):
+            if not await trial_ok(message):
+                return
+            uid = message.from_user.id if message.from_user else 0
+            rows = await feedback_list_user(bot_id, uid)
+            if not rows:
+                await message.answer("📋 Sizda hozircha baholar yo'q.", reply_markup=reply_menu(template))
+                return
+            lines = ["📋 Sizning baholaringiz:\n"]
+            for r in rows:
+                stars = "⭐" * r["rating"]
+                cmt = r["comment"] or "—"
+                lines.append(f"{stars} — {cmt}")
+            await message.answer("\n".join(lines), reply_markup=reply_menu(template))
+
+        @dp.message(F.text == "⭐ Barcha fikrlar")
+        async def fb_all(message: types.Message):
+            if not await trial_ok(message):
+                return
+            uid = message.from_user.id if message.from_user else 0
+            if not await is_admin(uid):
+                await message.answer("⛔ Bu bo'lim faqat admin uchun.", reply_markup=reply_menu(template))
+                return
+            rows = await feedback_list_all(bot_id)
+            if not rows:
+                await message.answer("⭐ Hozircha fikrlar yo'q.", reply_markup=admin_menu(template))
+                return
+            lines = ["⭐ Barcha fikrlar:\n"]
+            for r in rows:
+                stars = "⭐" * r["rating"]
+                who = r["tg_username"] or "mijoz"
+                cmt = r["comment"] or "—"
+                lines.append(f"{stars} [{who}] {cmt}")
+            await message.answer("\n".join(lines), reply_markup=admin_menu(template))
+
+        @dp.message(F.text == "📊 O'rtacha ball")
+        async def fb_avg(message: types.Message):
+            if not await trial_ok(message):
+                return
+            uid = message.from_user.id if message.from_user else 0
+            if not await is_admin(uid):
+                await message.answer("⛔ Bu bo'lim faqat admin uchun.", reply_markup=reply_menu(template))
+                return
+            s = await feedback_average(bot_id)
+            avg_stars = "⭐" * round(s["avg"]) if s["avg"] else "—"
+            await message.answer(
+                f"📊 Statistika\n\n📊 O'rtacha ball: {s['avg']} / 5\n{avg_stars}\n📝 Jami fikrlar: {s['count']}",
+                reply_markup=admin_menu(template),
+            )
+
+        @dp.message(F.text == "ℹ️ Ma'lumot")
+        async def fb_info(message: types.Message):
+            if not await trial_ok(message):
+                return
+            uid = message.from_user.id if message.from_user else 0
+            menu = admin_menu(template) if await is_admin(uid) else reply_menu(template)
+            await message.answer(
+                "ℹ️ Fikr-mulohaza boti\n\n"
+                "Mijozlar biznesni 1-5 yulduz baholaydi va izoh qoldiradi. "
+                "Admin barcha fikrlarni va o'rtacha ballni ko'radi.",
+                reply_markup=menu,
+            )
+
+        @dp.message()
+        async def fb_fallback(message: types.Message):
+            if not await trial_ok(message):
+                return
+            uid = message.from_user.id if message.from_user else 0
+            uname = (
+                ("@" + message.from_user.username) if (message.from_user and message.from_user.username)
+                else (message.from_user.full_name if message.from_user else "Foydalanuvchi")
+            )
+            st = states.get(uid)
+            if st and st.get("step") == "fb_comment":
+                rating = st.get("rating", 5)
+                comment = (message.text or "").strip()
+                if comment == "-":
+                    comment = ""
+                states.pop(uid, None)
+                await feedback_save(bot_id, uid, uname, rating, comment)
+                await message.answer(
+                    f"✅ Rahmat! Fikringiz qabul qilindi.\n\nBaho: {'⭐' * rating}",
+                    reply_markup=reply_menu(template),
+                )
+                return
+            await message.answer("Menyudan bo'lim tanlang.", reply_markup=reply_menu(template))
+
+    # ── NEWS: yangiliklar (birinchi /start = admin) ──
+    elif template == "news":
+        async def is_admin(uid: int) -> bool:
+            a = await get_bot_admin(bot_id)
+            return a is not None and a["admin_id"] == uid
+
+        @dp.message(F.text == "📢 Obuna bo'lish")
+        async def news_sub(message: types.Message):
+            if not await trial_ok(message):
+                return
+            uid = message.from_user.id if message.from_user else 0
+            if await is_admin(uid):
+                await message.answer("Admin obuna bo'lolmaydi.", reply_markup=admin_menu(template))
+                return
+            uname = ("@" + message.from_user.username) if (message.from_user and message.from_user.username) else (message.from_user.full_name if message.from_user else "mijoz")
+            ok = await news_subscribe(bot_id, uid, uname)
+            if ok:
+                await message.answer("✅ Siz yangiliklarga obuna bo'ldingiz! Endi barcha yangiliklarni shu yerdan olasiz.", reply_markup=reply_menu(template))
+            else:
+                await message.answer("Siz allaqachon obuna bo'lgansiz.", reply_markup=reply_menu(template))
+
+        @dp.message(F.text == "🔕 Obunani bekor qilish")
+        async def news_unsub_msg(message: types.Message):
+            if not await trial_ok(message):
+                return
+            uid = message.from_user.id if message.from_user else 0
+            ok = await news_unsubscribe(bot_id, uid)
+            if ok:
+                await message.answer("🔕 Obunangiz bekor qilindi.", reply_markup=reply_menu(template))
+            else:
+                await message.answer("Siz obuna emassiz.", reply_markup=reply_menu(template))
+
+        @dp.message(F.text == "📨 Yangilik yuborish")
+        async def news_send(message: types.Message):
+            if not await trial_ok(message):
+                return
+            uid = message.from_user.id if message.from_user else 0
+            if not await is_admin(uid):
+                await message.answer("⛔ Bu bo'lim faqat admin uchun.", reply_markup=reply_menu(template))
+                return
+            states[uid] = {"step": "news_body"}
+            await message.answer("📨 Yangilik matnini yozing — u barcha obunachilarga tarqatiladi:", reply_markup=admin_menu(template))
+
+        @dp.message(F.text == "👥 Obunachilar")
+        async def news_count(message: types.Message):
+            if not await trial_ok(message):
+                return
+            uid = message.from_user.id if message.from_user else 0
+            if not await is_admin(uid):
+                await message.answer("⛔ Bu bo'lim faqat admin uchun.", reply_markup=reply_menu(template))
+                return
+            c = await news_subscriber_count(bot_id)
+            await message.answer(f"👥 Obunachilar soni: {c}", reply_markup=admin_menu(template))
+
+        @dp.message(F.text == "ℹ️ Ma'lumot")
+        async def news_info(message: types.Message):
+            if not await trial_ok(message):
+                return
+            uid = message.from_user.id if message.from_user else 0
+            menu = admin_menu(template) if await is_admin(uid) else reply_menu(template)
+            await message.answer(
+                "ℹ️ Yangiliklar boti\n\n"
+                "Mijozlar \"📢 Obuna bo'lish\" tugmasi orqali obunachi bo'ladi. "
+                "Admin yangilik matnini yuboradi — u barcha obunachilarga yetkaziladi.",
+                reply_markup=menu,
+            )
+
+        @dp.message()
+        async def news_fallback(message: types.Message):
+            if not await trial_ok(message):
+                return
+            uid = message.from_user.id if message.from_user else 0
+            st = states.get(uid)
+            if st and st.get("step") == "news_body":
+                if not await is_admin(uid):
+                    states.pop(uid, None)
+                    await message.answer("⛔ Faqat admin yangilik yubora oladi.", reply_markup=reply_menu(template))
+                    return
+                body = (message.text or "").strip()
+                if len(body) < 3:
+                    await message.answer("⛔ Matn juda qisqa. Qaytadan yozing:")
+                    return
+                states.pop(uid, None)
+                post_id = await news_create_post(bot_id, body)
+                subs = await news_subscriber_ids(bot_id)
+                sent = 0
+                for sid in subs:
+                    try:
+                        await message.bot.send_message(sid, f"📨 Yangilik:\n\n{body}")
+                        sent += 1
+                    except Exception:
+                        pass
+                await news_mark_sent(post_id, sent)
+                await message.answer(
+                    f"✅ Yangilik tarqatildi!\n\n👥 Obunachilar: {len(subs)}\n📬 Yuborildi: {sent}",
+                    reply_markup=admin_menu(template),
+                )
+                return
+            await message.answer("Menyudan bo'lim tanlang.", reply_markup=reply_menu(template))
+
+    # ── POLL: so'rovnomalar (birinchi /start = admin) ──
+    elif template == "poll":
+        async def is_admin(uid: int) -> bool:
+            a = await get_bot_admin(bot_id)
+            return a is not None and a["admin_id"] == uid
+
+        async def show_active_poll(message: types.Message, uid: int):
+            poll = await poll_get_active(bot_id)
+            if not poll:
+                if await is_admin(uid):
+                    await message.answer("📭 Hozir faol so'rov yo'q. \"📝 So'rov yaratish\" tugmasini bosing.", reply_markup=admin_menu(template))
+                else:
+                    await message.answer("📭 Hozir faol so'rov yo'q.", reply_markup=reply_menu(template))
+                return
+            options = json.loads(poll["options_json"])
+            kb = InlineKeyboardBuilder()
+            for i, opt in enumerate(options):
+                kb.button(text=opt, callback_data=f"pv:{poll['id']}:{i}")
+            kb.adjust(1)
+            await message.answer(f"📊 {poll['question']}", reply_markup=kb.as_markup())
+
+        @dp.message(F.text == "📊 Ovoz berish")
+        async def poll_vote_start(message: types.Message):
+            if not await trial_ok(message):
+                return
+            uid = message.from_user.id if message.from_user else 0
+            if await is_admin(uid):
+                await message.answer("Admin ovoz berolmaydi.", reply_markup=admin_menu(template))
+                return
+            await show_active_poll(message, uid)
+
+        @dp.callback_query(F.data.startswith("pv:"))
+        async def poll_vote_cb(callback: types.CallbackQuery):
+            uid = callback.from_user.id
+            try:
+                _, poll_id_str, choice_str = callback.data.split(":")
+                poll_id = int(poll_id_str)
+                choice = int(choice_str)
+            except (ValueError, IndexError):
+                await callback.answer("Noto'g'ri.")
+                return
+            ok = await poll_vote(poll_id, uid, choice)
+            if not ok:
+                await callback.answer("Siz allaqachon ovoz bergansiz.")
+                return
+            await callback.answer("✅ Ovoz qabul qilindi!")
+            await callback.message.edit_text("✅ Ovozingiz qabul qilindi! \"📈 Natijalar\" tugmasidan ko'ring.")
+
+        @dp.message(F.text == "📈 Natijalar")
+        async def poll_results_msg(message: types.Message):
+            if not await trial_ok(message):
+                return
+            uid = message.from_user.id if message.from_user else 0
+            poll = await poll_get_active(bot_id)
+            menu = admin_menu(template) if await is_admin(uid) else reply_menu(template)
+            if not poll:
+                await message.answer("📭 Hozir faol so'rov yo'q.", reply_markup=menu)
+                return
+            options = json.loads(poll["options_json"])
+            res = await poll_results(poll["id"])
+            counts = {r["choice"]: r["c"] for r in res}
+            total = sum(counts.values())
+            lines = [f"📊 {poll['question']}\n", f"Jami ovozlar: {total}\n"]
+            for i, opt in enumerate(options):
+                c = counts.get(i, 0)
+                pct = round(100 * c / total) if total else 0
+                bar = "█" * (pct // 10)
+                lines.append(f"{opt}: {c} ({pct}%) {bar}")
+            await message.answer("\n".join(lines), reply_markup=menu)
+
+        @dp.message(F.text == "📝 So'rov yaratish")
+        async def poll_create_start(message: types.Message):
+            if not await trial_ok(message):
+                return
+            uid = message.from_user.id if message.from_user else 0
+            if not await is_admin(uid):
+                await message.answer("⛔ Bu bo'lim faqat admin uchun.", reply_markup=reply_menu(template))
+                return
+            states[uid] = {"step": "poll_question"}
+            await message.answer("📝 Yangi so'rov.\n\nSavolni yozing:", reply_markup=admin_menu(template))
+
+        @dp.message(F.text == "📊 Faol so'rov")
+        async def poll_active(message: types.Message):
+            if not await trial_ok(message):
+                return
+            uid = message.from_user.id if message.from_user else 0
+            if not await is_admin(uid):
+                await message.answer("⛔ Bu bo'lim faqat admin uchun.", reply_markup=reply_menu(template))
+                return
+            await show_active_poll(message, uid)
+
+        @dp.message(F.text == "ℹ️ Ma'lumot")
+        async def poll_info(message: types.Message):
+            if not await trial_ok(message):
+                return
+            uid = message.from_user.id if message.from_user else 0
+            menu = admin_menu(template) if await is_admin(uid) else reply_menu(template)
+            await message.answer(
+                "ℹ️ So'rovnomalar boti\n\n"
+                "Admin savol va variantlarni kiritadi. Mijozlar ovoz beradi va natijani ko'radi.",
+                reply_markup=menu,
+            )
+
+        @dp.message()
+        async def poll_fallback(message: types.Message):
+            if not await trial_ok(message):
+                return
+            uid = message.from_user.id if message.from_user else 0
+            st = states.get(uid)
+            if st and st.get("step") == "poll_question":
+                q = (message.text or "").strip()
+                if len(q) < 3:
+                    await message.answer("⛔ Savol juda qisqa. Qaytadan yozing:")
+                    return
+                st["question"] = q
+                st["step"] = "poll_options"
+                await message.answer(
+                    "✅ Savol qabul qilindi.\n\nEndi variantlarni yozing — har bir variant yangi qatorda (2-6 ta):\n\n"
+                    "Masalan:\nHa\nYo'q\nBilmayman"
+                )
+                return
+            if st and st.get("step") == "poll_options":
+                if not await is_admin(uid):
+                    states.pop(uid, None)
+                    await message.answer("⛔ Faqat admin so'rov yaratadi.", reply_markup=reply_menu(template))
+                    return
+                raw = (message.text or "").strip()
+                opts = [o.strip() for o in raw.split("\n") if o.strip()]
+                if not 2 <= len(opts) <= 6:
+                    await message.answer("⛔ 2 dan 6 gacha variant kerak (har biri yangi qator). Qaytadan yozing:")
+                    return
+                q = st.get("question", "")
+                states.pop(uid, None)
+                await poll_create(bot_id, q, opts)
+                await message.answer(
+                    f"✅ So'rov yaratildi!\n\n📊 {q}\n" + "\n".join(f"{i+1}. {o}" for i, o in enumerate(opts)),
+                    reply_markup=admin_menu(template),
+                )
+                return
+            await message.answer("Menyudan bo'lim tanlang.", reply_markup=reply_menu(template))
+
+    # ── INFO: biznes ma'lumoti (birinchi /start = admin) ──
+    elif template == "info":
+        async def is_admin(uid: int) -> bool:
+            a = await get_bot_admin(bot_id)
+            return a is not None and a["admin_id"] == uid
+
+        async def render_info(message: types.Message, uid: int):
+            s = await info_get_settings(bot_id)
+            lines = [f"ℹ️ {s['business_name']}\n"]
+            if s["about"]:
+                lines.append(f"📝 Haqida:\n{s['about']}\n")
+            if s["services"]:
+                lines.append(f"🛠 Xizmatlar:\n{s['services']}\n")
+            if s["phone"]:
+                lines.append(f"📞 Telefon: {s['phone']}")
+            if s["address"]:
+                lines.append(f"📍 Manzil: {s['address']}")
+            if s["work_hours"]:
+                lines.append(f"🕐 Ish vaqti: {s['work_hours']}")
+            await message.answer("\n".join(lines), reply_markup=reply_menu(template))
+
+        @dp.message(F.text == "ℹ️ Biznes haqida")
+        async def info_about(message: types.Message):
+            if not await trial_ok(message):
+                return
+            uid = message.from_user.id if message.from_user else 0
+            if await is_admin(uid):
+                await message.answer("Admin mijoz ko'rinishini ko'radi 👇", reply_markup=admin_menu(template))
+            await render_info(message, uid)
+
+        @dp.message(F.text == "📞 Aloqa")
+        async def info_phone(message: types.Message):
+            if not await trial_ok(message):
+                return
+            s = await info_get_settings(bot_id)
+            uid = message.from_user.id if message.from_user else 0
+            menu = admin_menu(template) if await is_admin(uid) else reply_menu(template)
+            await message.answer(f"📞 Aloqa: {s['phone'] or 'sozlanmagan'}", reply_markup=menu)
+
+        @dp.message(F.text == "📍 Manzil")
+        async def info_addr(message: types.Message):
+            if not await trial_ok(message):
+                return
+            s = await info_get_settings(bot_id)
+            uid = message.from_user.id if message.from_user else 0
+            menu = admin_menu(template) if await is_admin(uid) else reply_menu(template)
+            await message.answer(f"📍 Manzil: {s['address'] or 'sozlanmagan'}\n🕐 {s['work_hours'] or '—'}", reply_markup=menu)
+
+        @dp.message(F.text == "⚙️ Ma'lumot sozlash")
+        async def info_cfg(message: types.Message):
+            if not await trial_ok(message):
+                return
+            uid = message.from_user.id if message.from_user else 0
+            if not await is_admin(uid):
+                await message.answer("⛔ Bu bo'lim faqat admin uchun.", reply_markup=reply_menu(template))
+                return
+            states[uid] = {"step": "info_name", "cfg": {}}
+            s = await info_get_settings(bot_id)
+            extra = f"\n(hozirgi: {s['business_name']})" if s["business_name"] != "Biznes" else ""
+            await message.answer(f"⚙️ Ma'lumot sozlash\n\n1️⃣ Biznes nomi:{extra}", reply_markup=admin_menu(template))
+
+        @dp.message(F.text == "👁 Ko'rish")
+        async def info_view(message: types.Message):
+            if not await trial_ok(message):
+                return
+            uid = message.from_user.id if message.from_user else 0
+            if not await is_admin(uid):
+                await message.answer("⛔ Bu bo'lim faqat admin uchun.", reply_markup=reply_menu(template))
+                return
+            s = await info_get_settings(bot_id)
+            await message.answer(
+                "👁 Joriy ma'lumot:\n\n"
+                f"📋 {s['business_name']}\n📝 {s['about'] or '—'}\n🛠 {s['services'] or '—'}\n"
+                f"📞 {s['phone'] or '—'}\n📍 {s['address'] or '—'}\n🕐 {s['work_hours'] or '—'}",
+                reply_markup=admin_menu(template),
+            )
+
+        @dp.message(F.text == "ℹ️ Ma'lumot")
+        async def info_info(message: types.Message):
+            if not await trial_ok(message):
+                return
+            uid = message.from_user.id if message.from_user else 0
+            menu = admin_menu(template) if await is_admin(uid) else reply_menu(template)
+            await message.answer(
+                "ℹ️ Biznes ma'lumot boti\n\n"
+                "Admin biznes nomi, haqida, xizmatlar, telefon, manzil va ish vaqtini sozlaydi. "
+                "Mijozlar buni ko'radi.",
+                reply_markup=menu,
+            )
+
+        @dp.message()
+        async def info_fallback(message: types.Message):
+            if not await trial_ok(message):
+                return
+            uid = message.from_user.id if message.from_user else 0
+            st = states.get(uid)
+            cfg = st.get("cfg", {}) if st else {}
+            step = st.get("step") if st else None
+            if step == "info_name":
+                cfg["business_name"] = (message.text or "").strip() or "Biznes"
+                st["step"] = "info_about"
+                await message.answer(f"✅ Nomi: {cfg['business_name']}\n\n2️⃣ Biznes haqida (matn yoki \"-\"):")
+                return
+            if step == "info_about":
+                raw = (message.text or "").strip()
+                cfg["about"] = "" if raw == "-" else raw
+                st["step"] = "info_services"
+                await message.answer("✅ Saqlandi.\n\n3️⃣ Xizmatlar (har biri yangi qator yoki \"-\"):")
+                return
+            if step == "info_services":
+                raw = (message.text or "").strip()
+                cfg["services"] = "" if raw == "-" else raw
+                st["step"] = "info_phone"
+                await message.answer("✅ Saqlandi.\n\n4️⃣ Telefon raqami (yoki \"-\"):")
+                return
+            if step == "info_phone":
+                raw = (message.text or "").strip()
+                cfg["phone"] = "" if raw == "-" else raw
+                st["step"] = "info_address"
+                await message.answer("✅ Saqlandi.\n\n5️⃣ Manzil (yoki \"-\"):")
+                return
+            if step == "info_address":
+                raw = (message.text or "").strip()
+                cfg["address"] = "" if raw == "-" else raw
+                st["step"] = "info_hours"
+                await message.answer("✅ Saqlandi.\n\n6️⃣ Ish vaqti (masalan: Du-Sha 9:00-18:00 yoki \"-\"):")
+                return
+            if step == "info_hours":
+                raw = (message.text or "").strip()
+                cfg["work_hours"] = "" if raw == "-" else raw
+                states.pop(uid, None)
+                await info_update_settings(bot_id, cfg)
+                await message.answer(
+                    "✅ Ma'lumot saqlandi!\n\n"
+                    f"📋 {cfg['business_name']}\n📝 {cfg['about'] or '—'}\n🛠 {cfg['services'] or '—'}\n"
+                    f"📞 {cfg['phone'] or '—'}\n📍 {cfg['address'] or '—'}\n🕐 {cfg['work_hours'] or '—'}",
+                    reply_markup=admin_menu(template),
+                )
+                return
+            await message.answer("Menyudan bo'lim tanlang.", reply_markup=reply_menu(template))
+
+    # ── REQUEST ENGINE: 15 biznes shabloni (callback, consultation, complaint, ...) ──
+    elif template in REQUEST_TEMPLATES:
+        cfg = REQUEST_TEMPLATES[template]
+        fields = cfg["fields"]
+
+        async def is_admin(uid: int) -> bool:
+            a = await get_bot_admin(bot_id)
+            return a is not None and a["admin_id"] == uid
+
+        @dp.message(F.text == "📝 So'rov yuborish")
+        async def req_new(message: types.Message):
+            if not await trial_ok(message):
+                return
+            uid = message.from_user.id if message.from_user else 0
+            if await is_admin(uid):
+                await message.answer("Admin so'rov yuborolmaydi.", reply_markup=admin_menu(template))
+                return
+            states[uid] = {"step": "req_field", "idx": 0, "data": {}}
+            await message.answer(fields[0][1], reply_markup=reply_menu(template))
+
+        @dp.message(F.text == "📋 Mening so'rovlarim")
+        async def req_my(message: types.Message):
+            if not await trial_ok(message):
+                return
+            uid = message.from_user.id if message.from_user else 0
+            rows = await request_list_user(bot_id, uid)
+            if not rows:
+                await message.answer("📋 Sizda hozircha so'rovlar yo'q.", reply_markup=reply_menu(template))
+                return
+            lines = ["📋 Sizning so'rovlaringiz:\n"]
+            for r in rows:
+                status = "✅" if r["status"] == "done" else "⏳"
+                data = json.loads(r["data_json"])
+                summary = " · ".join(f"{k}: {v}" for k, v in data.items() if v)
+                lines.append(f"{status} #{r['id']} — {summary}")
+            await message.answer("\n".join(lines), reply_markup=reply_menu(template))
+
+        @dp.message(F.text == "📋 So'rovlar")
+        async def req_all(message: types.Message):
+            if not await trial_ok(message):
+                return
+            uid = message.from_user.id if message.from_user else 0
+            if not await is_admin(uid):
+                await message.answer("⛔ Bu bo'lim faqat admin uchun.", reply_markup=reply_menu(template))
+                return
+            rows = await request_list_all(bot_id)
+            if not rows:
+                await message.answer("📋 Hozircha so'rovlar yo'q.", reply_markup=admin_menu(template))
+                return
+            for r in rows:
+                data = json.loads(r["data_json"])
+                status = "✅ Bajarildi" if r["status"] == "done" else "🆕 Yangi"
+                body = "\n".join(f"  {k}: {v}" for k, v in data.items() if v)
+                kb = InlineKeyboardBuilder()
+                if r["status"] == "new":
+                    kb.button(text="✅ Bajarildi", callback_data=f"rqd:{r['id']}")
+                await message.answer(
+                    f"📋 #{r['id']} [{status}]\n👤 {r['tg_username'] or 'mijoz'}\n{body}",
+                    reply_markup=kb.as_markup() if r["status"] == "new" else None,
+                )
+            await message.answer(f"Jami: {len(rows)} so'rov", reply_markup=admin_menu(template))
+
+        @dp.callback_query(F.data.startswith("rqd:"))
+        async def req_done_cb(callback: types.CallbackQuery):
+            uid = callback.from_user.id
+            if not await is_admin(uid):
+                await callback.answer("⛔ Faqat admin.")
+                return
+            try:
+                req_id = int(callback.data.split(":", 1)[1])
+            except ValueError:
+                await callback.answer("Noto'g'ri.")
+                return
+            ok = await request_mark_done(req_id)
+            if ok:
+                await callback.answer("✅ Bajarildi deb belgilandi!")
+                await callback.message.edit_text((callback.message.text or "") + "\n\n✅ Bajarildi")
+            else:
+                await callback.answer("So'rov allaqachon bajarilgan yoki topilmadi.")
+
+        @dp.message(F.text == "ℹ️ Ma'lumot")
+        async def req_info(message: types.Message):
+            if not await trial_ok(message):
+                return
+            uid = message.from_user.id if message.from_user else 0
+            menu = admin_menu(template) if await is_admin(uid) else reply_menu(template)
+            await message.answer(
+                f"ℹ️ {cfg['label']} boti\n\n"
+                "Mijoz \"📝 So'rov yuborish\" orqali forma to'ldiradi, admin esa \"📋 So'rovlar\" "
+                "orqali barchasini ko'radi va bajarilganlarni ✅ belgilaydi.",
+                reply_markup=menu,
+            )
+
+        @dp.message()
+        async def req_fallback(message: types.Message):
+            if not await trial_ok(message):
+                return
+            uid = message.from_user.id if message.from_user else 0
+            uname = (
+                ("@" + message.from_user.username) if (message.from_user and message.from_user.username)
+                else (message.from_user.full_name if message.from_user else "Foydalanuvchi")
+            )
+            st = states.get(uid)
+            if st and st.get("step") == "req_field":
+                idx = st.get("idx", 0)
+                key, _prompt = fields[idx]
+                val = (message.text or "").strip()
+                if val == "-":
+                    val = ""
+                st["data"][key] = val
+                idx += 1
+                if idx >= len(fields):
+                    data = st["data"]
+                    states.pop(uid, None)
+                    req_id = await request_save(bot_id, template, uid, uname, data)
+                    admin = await get_bot_admin(bot_id)
+                    if admin and admin["admin_id"] != uid:
+                        body = "\n".join(f"  {k}: {v}" for k, v in data.items() if v)
+                        try:
+                            await message.bot.send_message(
+                                admin["admin_id"],
+                                f"🔔 Yangi so'rov! #{req_id}\n📋 {cfg['label']}\n👤 {uname}\n{body}",
+                            )
+                        except Exception:
+                            pass
+                    summary = " · ".join(f"{k}: {v}" for k, v in data.items() if v)
+                    await message.answer(
+                        f"✅ So'rovingiz qabul qilindi! #{req_id}\n\n{summary}\n\nTez orada siz bilan bog'lanamiz.",
+                        reply_markup=reply_menu(template),
+                    )
+                    return
+                st["idx"] = idx
+                await message.answer(fields[idx][1], reply_markup=reply_menu(template))
+                return
+            await message.answer("Menyudan bo'lim tanlang.", reply_markup=reply_menu(template))
 
     return dp
